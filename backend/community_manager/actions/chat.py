@@ -890,6 +890,9 @@ class CommunityManagerTaskChatAction:
             (sticker_rules_chat_ids, gift_rules_chat_ids),
             (sticker_owners_telegram_ids, gift_owners_telegram_ids),
         ):
+            if not user_ids:
+                continue
+
             users = self.user_service.get_all(telegram_ids=user_ids)
             chat_members = self.telegram_chat_user_service.get_all(
                 user_ids=[user.id for user in users],
