@@ -785,12 +785,7 @@ class CommunityManagerChatAction(BaseAction):
             logger.info(
                 f"Notified chat {chat.id!r} about control level change. Full control: {is_fully_managed}"
             )
-            self.telegram_chat_service.set_control_level(
-                chat=chat,
-                new_control_level=is_fully_managed,
-            )
         except RPCError as e:
-            self.redis_service.delete(f"set_control_level_{chat.id}")
             logger.error(
                 f"Failed to notify chat {chat.id!r} about control level change",
                 exc_info=e,

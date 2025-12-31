@@ -1,10 +1,12 @@
 import logging
 from collections import defaultdict
 
+from celery.result import AsyncResult
 from fastapi import HTTPException
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 from starlette.status import (
+    HTTP_502_BAD_GATEWAY,
     HTTP_400_BAD_REQUEST,
     HTTP_429_TOO_MANY_REQUESTS,
 )
@@ -63,7 +65,7 @@ from core.enums.chat import CustomTelegramChatOrderingRulesEnum
 from core.services.chat.rule.group import TelegramChatRuleGroupService
 from core.services.chat.user import TelegramChatUserService
 from core.services.superredis import RedisService
-from core.utils.task import sender
+from core.utils.task import wait_for_task, sender
 
 logger = logging.getLogger(__name__)
 
@@ -302,22 +304,20 @@ class TelegramChatManageAction(ManagedChatBaseAction, TelegramChatAction):
         logger.info(
             f"Setting control level for chat {self.chat.id} to {is_fully_managed}"
         )
-        sender.send_task(
+        chat = self.telegram_chat_service.set_control_level(self.chat, is_fully_managed)
+        notifier = sender.send_task(
             "notify-chat-mode-changed",
             args=(self.chat.id, is_fully_managed, effective_in_days),
             queue=CELERY_SYSTEM_QUEUE_NAME,
         )
-        # FIXME: enable waiting for it based on signals and task completion
-        #  (probably with a different way than celery sync tasks)
-        # if not await wait_for_task(task_result=notifier):
-        #     # Ensure that the flag is removed to allow retrying in case of error
-        #     redis_service.delete(f"set_control_level_{self.chat.id}")
-        #     raise HTTPException(
-        #         status_code=HTTP_502_BAD_GATEWAY,
-        #         detail="Something went wrong while changing the chat mode. Please, try again later.",
-        #     )
-        self.db_session.refresh(self.chat)
-        return TelegramChatDTO.from_object(self.chat)
+        if not await wait_for_task(task_result=notifier):
+            # Ensure that the flag is removed to allow retrying in case of error
+            redis_service.delete(f"set_control_level_{self.chat.id}")
+            raise HTTPException(
+                status_code=HTTP_502_BAD_GATEWAY,
+                detail="Something went wrong while changing the chat mode. Please, try again later.",
+            )
+        return TelegramChatDTO.from_object(chat)
 
     async def get_with_eligibility_rules(self) -> TelegramChatWithRulesDTO:
         """
@@ -418,18 +418,16 @@ class TelegramChatManageAction(ManagedChatBaseAction, TelegramChatAction):
             return self.chat
 
         logger.info(f"Enabling chat {self.chat.id!r}")
-        sender.send_task(
+        async_task_id: AsyncResult = sender.send_task(
             "enable-chat",
             args=(self.chat.id,),
             queue=CELERY_SYSTEM_QUEUE_NAME,
         )
-        # FIXME: enable waiting for it based on signals and task completion
-        #  (probably with a different way than celery sync tasks)
-        # if not await wait_for_task(task_result=async_task_id):
-        #     raise HTTPException(
-        #         status_code=HTTP_502_BAD_GATEWAY,
-        #         detail="Something went wrong while enabling the chat. Please, try again later.",
-        #     )
+        if not await wait_for_task(task_result=async_task_id):
+            raise HTTPException(
+                status_code=HTTP_502_BAD_GATEWAY,
+                detail="Something went wrong while enabling the chat. Please, try again later.",
+            )
         self.db_session.refresh(self.chat)
         return self.chat
 
@@ -457,18 +455,16 @@ class TelegramChatManageAction(ManagedChatBaseAction, TelegramChatAction):
             return self.chat
 
         logger.info(f"Disabling chat {self.chat.id!r}")
-        sender.send_task(
+        async_task_id: AsyncResult = sender.send_task(
             "disable-chat",
             args=(self.chat.id,),
             queue=CELERY_SYSTEM_QUEUE_NAME,
         )
-        # FIXME: enable waiting for it based on signals and task completion
-        #  (probably with a different way than celery sync tasks)
-        # if not await wait_for_task(task_result=async_task_id):
-        #     raise HTTPException(
-        #         status_code=HTTP_502_BAD_GATEWAY,
-        #         detail="Something went wrong while disabling the chat. Please, try again later.",
-        #     )
+        if not await wait_for_task(task_result=async_task_id):
+            raise HTTPException(
+                status_code=HTTP_502_BAD_GATEWAY,
+                detail="Something went wrong while disabling the chat. Please, try again later.",
+            )
         self.db_session.refresh(self.chat)
         return self.chat
 
