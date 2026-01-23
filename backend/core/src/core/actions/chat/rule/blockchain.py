@@ -619,7 +619,7 @@ class TelegramChatToncoinAction(ManagedChatBaseAction):
         self.refresh_chat_floor_price()
         return ChatEligibilityRuleDTO.from_toncoin_rule(updated_rule)
 
-    def delete(self, rule_id: int) -> None:
+    async def delete(self, rule_id: int) -> None:
         try:
             group_id = self.telegram_chat_toncoin_service.get(
                 rule_id, chat_id=self.chat.id
@@ -631,6 +631,5 @@ class TelegramChatToncoinAction(ManagedChatBaseAction):
             )
         self.telegram_chat_toncoin_service.delete(rule_id, chat_id=self.chat.id)
         logger.info(f"Deleted chat TON rule {rule_id!r}")
-
         self.refresh_chat_floor_price()
         self.remove_group_if_empty(group_id=group_id)

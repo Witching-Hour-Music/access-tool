@@ -26,7 +26,7 @@ services:
     volumes:
       - ./backend/api:/app/api
       - ./backend/core:/app/core
-    command: [ "uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--reload" ]
+    command: [ "uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--reload", "--log-level=info" ]
 
 
   nginx:

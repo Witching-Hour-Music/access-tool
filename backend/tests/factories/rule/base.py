@@ -8,7 +8,6 @@ class TelegramChatRuleBaseFactory(BaseSQLAlchemyModelFactory):
         abstract = True
         sqlalchemy_session_persistence = "flush"
 
-    id = factory.Sequence(lambda n: n + 1)
     group_id = factory.SelfAttribute("group.id")
     group = factory.SubFactory(
         "tests.factories.rule.group.TelegramChatRuleGroupFactory"

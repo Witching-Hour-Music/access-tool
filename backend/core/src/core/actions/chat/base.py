@@ -107,19 +107,19 @@ class ManagedChatBaseAction(BaseAction):
             to be removed.
         """
         try:
-            group_removed = self.telegram_chat_rule_group_service.delete(
-                chat_id=self.chat.id, group_id=group_id
-            )
-            if group_removed:
-                logger.info(
-                    f"Deleted rule group {group_id!r} for chat {self.chat.id!r} as it had no rules left."
+            with self.db_session.begin_nested():
+                group_removed = self.telegram_chat_rule_group_service.delete(
+                    chat_id=self.chat.id, group_id=group_id
                 )
-            else:
-                logger.warning(
-                    f"Group {group_id!r} was not deleted as it was not found."
-                )
+                if group_removed:
+                    logger.info(
+                        f"Deleted rule group {group_id!r} for chat {self.chat.id!r} as it had no rules left."
+                    )
+                else:
+                    logger.warning(
+                        f"Group {group_id!r} was not deleted as it was not found."
+                    )
         except IntegrityError:
-            self.db_session.rollback()
             logger.debug(f"Group {group_id!r} is not empty")
 
         return None
