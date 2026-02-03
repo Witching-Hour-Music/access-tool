@@ -10,11 +10,14 @@ from telethon.tl.types import (
     ChannelParticipantBanned,
     ChannelParticipantSelf,
     User as TelethonUser,
-    ChannelParticipantCreator,
     ChatInviteExported,
 )
 
-from core.constants import REQUIRED_ADMIN_PRIVILEGES, REQUIRED_BOT_PRIVILEGES
+from community_manager.utils import (
+    is_chat_participant_admin,
+    is_chat_participant_manager_admin,
+)
+from core.constants import REQUIRED_BOT_PRIVILEGES
 
 logger = logging.getLogger(__name__)
 
@@ -121,18 +124,15 @@ class ChatAdminChangeEventBuilder(EventBuilder):
 
         @property
         def is_demoted(self) -> bool:
-            return isinstance(
-                self.prev_participant, ChannelParticipantAdmin
-            ) and not isinstance(
-                self.new_participant,
-                (ChannelParticipantAdmin, ChannelParticipantCreator),
-            )
+            return is_chat_participant_admin(
+                chat_participant=self.prev_participant
+            ) and not is_chat_participant_admin(chat_participant=self.new_participant)
 
         @property
         def is_promoted(self) -> bool:
-            return not isinstance(
-                self.prev_participant, ChannelParticipantAdmin
-            ) and isinstance(self.new_participant, ChannelParticipantAdmin)
+            return not is_chat_participant_admin(
+                chat_participant=self.prev_participant
+            ) and is_chat_participant_admin(chat_participant=self.new_participant)
 
         @property
         def has_enough_rights(self) -> bool:
@@ -142,28 +142,7 @@ class ChatAdminChangeEventBuilder(EventBuilder):
                 )
                 return False
 
-            if not isinstance(self.new_participant, ChannelParticipantAdmin):
-                logger.debug(
-                    "User %d is not an admin in the chat %d",
-                    self.user.id,
-                    self.original_update.channel_id,
-                )
-                return False
-            elif not all(
-                [
-                    getattr(self.new_participant.admin_rights, right)
-                    for right in REQUIRED_ADMIN_PRIVILEGES
-                ]
-            ):
-                logger.warning(
-                    "User %d has insufficient permissions in the chat %d: %s",
-                    self.user.id,
-                    self.original_update.channel_id,
-                    self.new_participant.admin_rights,
-                )
-                return False
-
-            return True
+            return is_chat_participant_manager_admin(self.new_participant)
 
         @property
         def sufficient_bot_privileges(self) -> bool:

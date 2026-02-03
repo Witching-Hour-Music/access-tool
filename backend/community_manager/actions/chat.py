@@ -18,6 +18,7 @@ from telethon.utils import get_peer_id
 from community_manager.dtos.chat import TargetChatMembersDTO
 from community_manager.events import ChatAdminChangeEventBuilder
 from community_manager.settings import community_manager_settings
+from community_manager.utils import is_chat_participant_manager_admin
 from core.actions.authorization import AuthorizationAction
 from core.actions.base import BaseAction
 from core.actions.user import UserAction
@@ -144,7 +145,9 @@ class CommunityManagerChatAction(BaseAction):
             self.telegram_chat_user_service.create_or_update(
                 chat_id=chat_identifier,
                 user_id=user.id,
-                is_admin=hasattr(participant_user.participant, "admin_rights"),
+                is_admin=is_chat_participant_manager_admin(
+                    participant_user.participant
+                ),
                 is_managed=False,
             )
             processed_user_ids.append(user.id)
@@ -1100,12 +1103,13 @@ class CommunityManagerUserChatAction:
                 f"Failed to kick user {chat_member.user.telegram_id!r} from chat {chat_member.chat_id!r} as bot user lacks admin privileges",
                 exc_info=e,
             )
-            self.telegram_chat_service.set_insufficient_privileges(
-                chat_id=chat_member.chat_id, value=True
-            )
-            logger.info(
-                f"Set insufficient privileges flag for chat {chat_member.chat_id!r}."
-            )
+            # TODO: Fix this logic after telegram_chat_user.is_manager_admin/is_admin is properly indexed
+            # self.telegram_chat_service.set_insufficient_privileges(
+            #     chat_id=chat_member.chat_id, value=True
+            # )
+            # logger.info(
+            #     f"Set insufficient privileges flag for chat {chat_member.chat_id!r}."
+            # )
         except RPCError as e:
             logger.error(
                 f"Failed to kick user {chat_member.user.telegram_id!r} from chat {chat_member.chat_id!r}",
