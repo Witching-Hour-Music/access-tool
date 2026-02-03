@@ -144,7 +144,10 @@ class CommunityManagerChatAction(BaseAction):
             self.telegram_chat_user_service.create_or_update(
                 chat_id=chat_identifier,
                 user_id=user.id,
-                is_admin=hasattr(participant_user.participant, "admin_rights"),
+                is_admin=isinstance(
+                    participant_user.participant,
+                    (types.ChannelParticipantAdmin, types.ChannelParticipantCreator),
+                ),
                 is_managed=False,
             )
             processed_user_ids.append(user.id)
