@@ -6,34 +6,39 @@ from aiogram import Bot
 from aiogram.types import ChatInviteLink
 from aiogram.exceptions import TelegramRetryAfter
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 
 from community_manager.settings import community_manager_settings
 
 logger = logging.getLogger(__name__)
 
 
-_bot_instance: Bot | None = None
-
-
-def get_bot() -> Bot:
-    global _bot_instance
-    if _bot_instance is None:
-        _bot_instance = Bot(
-            token=community_manager_settings.telegram_bot_token,
-            default=DefaultBotProperties(parse_mode="MarkdownV2"),
-        )
-    return _bot_instance
-
-
 class TelegramBotApiService:
     def __init__(self) -> None:
-        self.bot = get_bot()
+        self.bot: Bot | None = None
+
+    async def __aenter__(self) -> "TelegramBotApiService":
+        session = AiohttpSession()
+        self.bot = Bot(
+            token=community_manager_settings.telegram_bot_token,
+            session=session,
+            default=DefaultBotProperties(parse_mode="MarkdownV2"),
+        )
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self.bot:
+            await self.bot.session.close()
 
     async def _safe_request(self, func, *args, **kwargs) -> Any:
         """
         Wraps a request with basic retry logic for 429s.
-        Ideally this should be a middleware, but for simple service calls this works.
         """
+        if not self.bot:
+            raise RuntimeError(
+                "TelegramBotApiService must be used as a context manager"
+            )
+
         try:
             return await func(*args, **kwargs)
         except TelegramRetryAfter as e:

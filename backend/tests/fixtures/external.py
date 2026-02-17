@@ -24,6 +24,14 @@ def mock_telegram_bot_api_service(mocker):
         return_value=mock_invite_link_result
     )
 
+    # Configure async context manager support
+    # __aenter__ returns self (mock_instance)
+    async def async_enter(*args, **kwargs):
+        return mock_instance
+
+    mock_instance.__aenter__ = AsyncMock(side_effect=async_enter)
+    mock_instance.__aexit__ = AsyncMock()
+
     # Patch in community_manager.actions.chat where it's imported
     mock_class = mocker.patch(
         "community_manager.actions.chat.TelegramBotApiService", autospec=True

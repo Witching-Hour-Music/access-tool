@@ -66,7 +66,7 @@ class CommunityManagerChatAction(BaseAction):
             bot_token=community_manager_settings.telegram_bot_token,
             session_path=community_manager_settings.telegram_session_path,
         )
-        self.bot_api_service = TelegramBotApiService()
+        # self.bot_api_service = TelegramBotApiService()
 
     async def _get_chat_data(
         self,
@@ -212,9 +212,10 @@ class CommunityManagerChatAction(BaseAction):
         # Create an invite link if we have privileges
         if event.sufficient_bot_privileges:
             try:
-                invite_link_obj = await self.bot_api_service.create_chat_invite_link(
-                    chat_id=chat_id, name="Access Tool Link"
-                )
+                async with TelegramBotApiService() as bot_service:
+                    invite_link_obj = await bot_service.create_chat_invite_link(
+                        chat_id=chat_id, name="Access Tool Link"
+                    )
                 self.telegram_chat_service.refresh_invite_link(
                     chat_id=chat_id, invite_link=invite_link_obj.invite_link
                 )
@@ -442,9 +443,10 @@ class CommunityManagerChatAction(BaseAction):
         else:
             # Use Bot API for kicking to be consistent and scalable
             try:
-                await self.bot_api_service.kick_chat_member(
-                    chat_id=chat_id, user_id=local_user.telegram_id
-                )
+                async with TelegramBotApiService() as bot_service:
+                    await bot_service.kick_chat_member(
+                        chat_id=chat_id, user_id=local_user.telegram_id
+                    )
             except Exception as e:
                 logger.error(
                     f"Failed to kick user {local_user.telegram_id!r} from chat {chat_id!r}: {e}",
@@ -660,16 +662,17 @@ class CommunityManagerChatAction(BaseAction):
                             ]
                         )
 
-                    await self.bot_api_service.send_message(
-                        chat_id=telegram_user_id,
-                        text=fmt_text(
-                            "You join request for ",
-                            fmt_bold(chat.title),
-                            " was successfully approved\\! 🎉\n\nWelcome aboard\\! 🚀",
-                            sep="",
-                        ),
-                        reply_markup=keyboard,
-                    )
+                    async with TelegramBotApiService() as bot_service:
+                        await bot_service.send_message(
+                            chat_id=telegram_user_id,
+                            text=fmt_text(
+                                "You join request for ",
+                                fmt_bold(chat.title),
+                                " was successfully approved\\! 🎉\n\nWelcome aboard\\! 🚀",
+                                sep="",
+                            ),
+                            reply_markup=keyboard,
+                        )
                 except (TelegramBadRequest, TelegramForbiddenError) as e:
                     logger.warning(
                         f"Can't send confirmation message to user {telegram_user_id=!r}: {e}"
@@ -715,7 +718,7 @@ class CommunityManagerTaskChatAction:
             db_session
         )
         self.telegram_chat_service = TelegramChatService(db_session)
-        self.bot_api_service = TelegramBotApiService()
+        # self.bot_api_service = TelegramBotApiService()
         self.redis_service = RedisService()
 
     def get_updated_chat_members(self) -> TargetChatMembersDTO:
@@ -951,9 +954,8 @@ class CommunityManagerTaskChatAction:
             return chat
 
         try:
-            invite_link = await self.bot_api_service.create_chat_invite_link(
-                chat_id=chat.id
-            )
+            async with TelegramBotApiService() as bot_service:
+                invite_link = await bot_service.create_chat_invite_link(chat_id=chat.id)
             chat = self.telegram_chat_service.refresh_invite_link(
                 chat_id=chat.id, invite_link=invite_link.invite_link
             )
@@ -974,9 +976,10 @@ class CommunityManagerTaskChatAction:
         chat = self.telegram_chat_service.get(chat_id)
         try:
             if chat.invite_link:
-                await self.bot_api_service.revoke_chat_invite_link(
-                    chat_id=chat.id, invite_link=chat.invite_link
-                )
+                async with TelegramBotApiService() as bot_service:
+                    await bot_service.revoke_chat_invite_link(
+                        chat_id=chat.id, invite_link=chat.invite_link
+                    )
             chat = self.telegram_chat_service.disable(chat)
             logger.info(f"Removed invite link of chat {chat.id!r} and disabled it.")
         except Exception as e:
@@ -1021,10 +1024,11 @@ class CommunityManagerTaskChatAction:
                     sep="",
                 )
 
-            await self.bot_api_service.send_message(
-                chat_id=chat.id,
-                text=message,
-            )
+            async with TelegramBotApiService() as bot_service:
+                await bot_service.send_message(
+                    chat_id=chat.id,
+                    text=message,
+                )
             logger.info(
                 f"Notified chat {chat.id!r} about control level change. Full control: {is_fully_managed}"
             )
@@ -1043,7 +1047,7 @@ class CommunityManagerUserChatAction:
         self.telegram_chat_service = TelegramChatService(db_session)
         self.telegram_chat_user_service = TelegramChatUserService(db_session)
         self.authorization_action = AuthorizationAction(db_session)
-        self.bot_api_service = TelegramBotApiService()
+        # self.bot_api_service = TelegramBotApiService()
 
     async def kick_chat_member(self, chat_member: TelegramChatUser) -> None:
         """
@@ -1071,29 +1075,30 @@ class CommunityManagerUserChatAction:
             return
 
         try:
-            # use Bot API for kicking
-            await self.bot_api_service.kick_chat_member(
-                chat_id=chat_member.chat_id,
-                user_id=chat_member.user.telegram_id,
-            )
+            async with TelegramBotApiService() as bot_service:
+                # use Bot API for kicking
+                await bot_service.kick_chat_member(
+                    chat_id=chat_member.chat_id,
+                    user_id=chat_member.user.telegram_id,
+                )
 
-            if chat_member.user.allows_write_to_pm:
-                try:
-                    await self.bot_api_service.send_message(
-                        chat_id=chat_member.user.telegram_id,
-                        text=fmt_text(
-                            "You were kicked out of the ",
-                            fmt_bold(chat_member.chat.title),
-                            "\\.",
-                            sep="",
-                        ),
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Failed to send message to user {chat_member.user.telegram_id!r} "
-                        f"while kicking them from chat {chat_member.chat_id!r}",
-                        exc_info=e,
-                    )
+                if chat_member.user.allows_write_to_pm:
+                    try:
+                        await bot_service.send_message(
+                            chat_id=chat_member.user.telegram_id,
+                            text=fmt_text(
+                                "You were kicked out of the ",
+                                fmt_bold(chat_member.chat.title),
+                                "\\.",
+                                sep="",
+                            ),
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to send message to user {chat_member.user.telegram_id!r} "
+                            f"while kicking them from chat {chat_member.chat_id!r}",
+                            exc_info=e,
+                        )
 
             self.telegram_chat_user_service.delete(
                 chat_id=chat_member.chat_id, user_id=chat_member.user.id
