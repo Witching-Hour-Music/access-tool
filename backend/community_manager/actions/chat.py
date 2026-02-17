@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from tempfile import NamedTemporaryFile
 
@@ -145,10 +146,13 @@ class CommunityManagerChatAction(BaseAction):
         logger.info(f"Enqueued indexing task for chat {chat_identifier}")
 
     async def _create(
-        self, chat: ChatPeerType, sufficient_bot_privileges: bool = False
+        self,
+        chat: ChatPeerType,
+        logo_path: str | None,
+        sufficient_bot_privileges: bool = False,
     ) -> TelegramChatDTO:
         """
-        Creates a new BaseTelegramChatDTO instance by fetching and storing the profile photo of the chat,
+        Creates a new BaseTelegramChatDTO instance by storing the profile photo of the chat,
         generating the appropriate chat identifier, and persisting the chat information.
 
         If the chat already exists in the database, the function raises the TelegramChatAlreadyExists
@@ -156,13 +160,11 @@ class CommunityManagerChatAction(BaseAction):
         sufficient privileges and reflects this in the resultant DTO.
 
         :param chat: The chat entity for which the BaseTelegramChatDTO is created.
+        :param logo_path: The path to the stored logo file.
         :param sufficient_bot_privileges: Indicates whether the bot has sufficient privileges within the chat. Defaults to False.
         :return: A DTO containing the details of the created Telegram chat.
         :raises TelegramChatAlreadyExists: If the chat already exists in the database.
         """
-        logo_path = await self.fetch_and_push_profile_photo(
-            chat, current_logo_path=None
-        )
         try:
             chat_id = get_peer_id(chat, add_mark=True)
             telegram_chat = self.telegram_chat_service.create(
@@ -198,41 +200,93 @@ class CommunityManagerChatAction(BaseAction):
                 f"Chat {chat_id!r} doesn't exist, but bot was added without admin rights. Skipping."
             )
 
-        chat = await self._get_chat_data(chat_id)
-        if chat.username:
-            logger.warning(
-                f"Bot added to the public chat/channel {chat.username!r}. Skipping..."
-            )
-            raise TelegramChatPublicError(f"Chat {chat.username!r} is public.")
-        telegram_chat_dto = await self._create(
-            chat, sufficient_bot_privileges=event.sufficient_bot_privileges
-        )
-        logger.info(f"Chat {chat.id!r} created successfully")
+        async def _get_chat_data_and_assets() -> tuple[ChatPeerType, str | None]:
+            chat = await self._get_chat_data(chat_id)
+            if chat.username:
+                logger.warning(
+                    f"Bot added to the public chat/channel {chat.username!r}. Skipping..."
+                )
+                raise TelegramChatPublicError(f"Chat {chat.username!r} is public.")
 
-        # Create an invite link if we have privileges
-        if event.sufficient_bot_privileges:
+            logo_path = None
+            if getattr(chat, "photo", None) and not isinstance(
+                chat.photo, types.ChatPhotoEmpty
+            ):
+                logo_path = f"{chat.photo.photo_id}.png"
+
+            return chat, logo_path
+
+        async def _create_invite_link() -> str | None:
+            if not event.sufficient_bot_privileges:
+                return None
+
             try:
                 async with TelegramBotApiService() as bot_service:
                     invite_link_obj = await bot_service.create_chat_invite_link(
                         chat_id=chat_id, name="Access Tool Link"
                     )
-                self.telegram_chat_service.refresh_invite_link(
-                    chat_id=chat_id, invite_link=invite_link_obj.invite_link
-                )
-                logger.info(f"Invite link created for chat {chat.id!r}")
+                    return invite_link_obj.invite_link
             except Exception as e:
                 logger.warning(
-                    f"Failed to create invite link for chat {chat.id!r}: {e}"
+                    f"Failed to create invite link for chat {chat_id!r}: {e}"
+                )
+                return None
+
+        # 1. Get chat data and determine logo path (if any)
+        chat, logo_path = await _get_chat_data_and_assets()
+
+        # 2. Create chat entity in DB immediately with available data
+        telegram_chat_dto = await self._create(
+            chat,
+            logo_path=logo_path,
+            sufficient_bot_privileges=event.sufficient_bot_privileges,
+        )
+        self.db_session.commit()
+        logger.info(f"Chat {chat.id!r} created successfully")
+
+        # 3. Execute IO-bound tasks in parallel:
+        #    - fetch/upload logo (no DB update needed as path is already set)
+        #    - create invite link (will update DB later)
+        #    - index chat (safe now as chat exists in DB)
+
+        async def _upload_logo_task():
+            if logo_path:
+                await self.fetch_and_push_profile_photo(chat, current_logo_path=None)
+
+        async def _index_task():
+            try:
+                await self._index(chat)
+                logger.info(f"Chat {chat.id!r} indexed successfully")
+            except Exception as e:
+                logger.error(
+                    f"Failed to enqueue indexing for chat {chat.id!r}: {e}. "
+                    f"Chat created without initial members index."
                 )
 
-        await self._index(chat)
+        _, invite_link, _ = await asyncio.gather(
+            _upload_logo_task(),
+            _create_invite_link(),
+            _index_task(),
+        )
+
+        # 4. Update invite link if created
+        if invite_link:
+            self.telegram_chat_service.refresh_invite_link(
+                chat_id=chat_id, invite_link=invite_link
+            )
+            logger.info(f"Invite link created for chat {chat.id!r}")
+
         logger.info(f"Chat {chat.id!r} indexed successfully")
+
         members_count = self.telegram_chat_user_service.get_members_count(
             telegram_chat_dto.id
         )
-        return TelegramChatDTO.model_validate(
-            {**telegram_chat_dto.model_dump(), "members_count": members_count}
-        )
+        # Return updated DTO (refetching to include updates like invite_link)
+        updated_chat = self.telegram_chat_service.get(chat_id)
+        return TelegramChatDTO.from_object(
+            obj=updated_chat,
+            insufficient_privileges=not event.sufficient_bot_privileges,
+        ).model_copy(update={"members_count": members_count})
 
     async def refresh_all(self) -> None:
         """
