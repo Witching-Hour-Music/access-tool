@@ -70,6 +70,7 @@ def main() -> None:
     health_thread.start()
 
     telethon_service.start_sync()
+    logger.info("Telegram client catching up...")
     telethon_service.client.loop.run_until_complete(telethon_service.client.catch_up())
 
     # Start the Gateway Service as a background task on the same loop
