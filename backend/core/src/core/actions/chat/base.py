@@ -55,7 +55,7 @@ class ManagedChatBaseAction(BaseAction):
             )
 
         if self.is_admin_action:
-            if not self.telegram_chat_user_service.is_chat_admin(
+            if not self.telegram_chat_user_service.is_chat_manager_admin(
                 chat_id=chat.id, user_id=requestor.id
             ):
                 raise HTTPException(

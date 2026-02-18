@@ -32,5 +32,6 @@ class TelegramChatUserFactory(BaseSQLAlchemyModelFactory):
     chat_id = factory.SelfAttribute("chat.id")
     chat = factory.SubFactory("tests.factories.chat.TelegramChatFactory")
     is_admin = False
+    is_manager_admin = factory.LazyAttribute(lambda o: o.is_admin)
     is_managed = True
     created_at = factory.Faker("date_time_this_year")

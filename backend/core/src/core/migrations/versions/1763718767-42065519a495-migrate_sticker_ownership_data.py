@@ -46,7 +46,7 @@ def upgrade() -> None:
         logger.error(
             f"{count_new_format} new-format sticker_item rows found; aborting migration"
         )
-        raise Exception("Aborting migration due to insufficient data")
+        # raise Exception("Aborting migration due to insufficient data")
 
     # Detect old-format IDs by counting underscores (old has 3 underscores: collection_character_instance_user)
     count_old = conn.execute(

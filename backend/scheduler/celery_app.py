@@ -17,13 +17,6 @@ def create_app() -> Celery:
         {
             "broker_url": core_settings.broker_url,
             "result_backend": core_settings.broker_url,
-            "include": [
-                "community_manager.tasks",
-                "indexer_blockchain.tasks",
-                "indexer_gifts.tasks",
-                "indexer_price.tasks",
-                "indexer_stickers.tasks",
-            ],
             "beat_schedule": {
                 "check-chat-members": {
                     "task": "check-chat-members",

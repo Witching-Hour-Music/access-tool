@@ -13,22 +13,35 @@ from core.services.chat import logger
 
 class TelegramChatUserService(BaseService):
     def _create(
-        self, chat_id: int, user_id: int, is_admin: bool, is_managed: bool
+        self,
+        chat_id: int,
+        user_id: int,
+        is_admin: bool,
+        is_managed: bool,
+        is_manager_admin: bool = False,
     ) -> TelegramChatUser:
         chat_user = TelegramChatUser(
             chat_id=chat_id,
             user_id=user_id,
-            is_admin=is_admin,
+            is_admin=is_admin or is_manager_admin,
             is_managed=is_managed,
+            is_manager_admin=is_manager_admin,
         )
         self.db_session.add(chat_user)
         logger.debug(f"Telegram Chat User {chat_user!r} created.")
         return chat_user
 
     def create(
-        self, chat_id: int, user_id: int, is_admin: bool, is_managed: bool
+        self,
+        chat_id: int,
+        user_id: int,
+        is_admin: bool,
+        is_managed: bool,
+        is_manager_admin: bool = False,
     ) -> TelegramChatUser:
-        chat_user = self._create(chat_id, user_id, is_admin, is_managed)
+        chat_user = self._create(
+            chat_id, user_id, is_admin, is_managed, is_manager_admin
+        )
         self.db_session.flush()
         return chat_user
 
@@ -42,13 +55,22 @@ class TelegramChatUserService(BaseService):
         )
 
     def get_or_create(
-        self, chat_id: int, user_id: int, is_admin: bool, is_managed: bool
+        self,
+        chat_id: int,
+        user_id: int,
+        is_admin: bool,
+        is_managed: bool,
+        is_manager_admin: bool = False,
     ) -> TelegramChatUser:
         try:
             return self.get(chat_id, user_id)
         except NoResultFound:
             return self.create(
-                chat_id, user_id, is_admin=is_admin, is_managed=is_managed
+                chat_id,
+                user_id,
+                is_admin=is_admin,
+                is_managed=is_managed,
+                is_manager_admin=is_manager_admin,
             )
 
     def get_members_count(self, chat_id: int) -> int:
@@ -171,20 +193,32 @@ class TelegramChatUserService(BaseService):
         except NoResultFound:
             return None
 
-    def update(self, chat_user: TelegramChatUser, is_admin: bool) -> TelegramChatUser:
-        chat_user.is_admin = is_admin
+    def update(
+        self,
+        chat_user: TelegramChatUser,
+        is_admin: bool,
+        is_manager_admin: bool = False,
+    ) -> TelegramChatUser:
+        chat_user.is_admin = is_admin or is_manager_admin
+        chat_user.is_manager_admin = is_manager_admin
         self.db_session.flush()
         logger.debug(f"Telegram Chat User {chat_user!r} updated.")
         return chat_user
 
     def create_or_update(
-        self, chat_id: int, user_id: int, is_admin: bool, is_managed: bool
+        self,
+        chat_id: int,
+        user_id: int,
+        is_admin: bool,
+        is_managed: bool,
+        is_manager_admin: bool = False,
     ) -> TelegramChatUser:
         try:
             chat_user = self.get(chat_id, user_id)
             return self.update(
                 chat_user=chat_user,
                 is_admin=is_admin,
+                is_manager_admin=is_manager_admin,
             )
         except NoResultFound:
             logger.debug(
@@ -195,6 +229,7 @@ class TelegramChatUserService(BaseService):
                 user_id,
                 is_admin,
                 is_managed,
+                is_manager_admin,
             )
 
     def is_chat_member(self, chat_id: int, user_id: int) -> bool:
@@ -219,6 +254,18 @@ class TelegramChatUserService(BaseService):
             > 0
         )
 
+    def is_chat_manager_admin(self, chat_id: int, user_id: int) -> bool:
+        return (
+            self.db_session.query(TelegramChatUser)
+            .filter(
+                TelegramChatUser.chat_id == chat_id,
+                TelegramChatUser.user_id == user_id,
+                TelegramChatUser.is_manager_admin.is_(True),
+            )
+            .count()
+            > 0
+        )
+
     def promote_admin(self, chat_id: int, user_id: int) -> None:
         chat_user = self.get(chat_id, user_id)
         chat_user.is_admin = True
@@ -228,6 +275,7 @@ class TelegramChatUserService(BaseService):
     def demote_admin(self, chat_id: int, user_id: int) -> None:
         chat_user = self.get(chat_id, user_id)
         chat_user.is_admin = False
+        chat_user.is_manager_admin = False
         self.db_session.flush()
         logger.debug(f"Telegram Chat User {chat_user!r} demoted from admin.")
 
@@ -249,7 +297,11 @@ class TelegramChatUserService(BaseService):
 
         chat_users = [
             self._create(
-                chat_id=chat_id, user_id=user_id, is_admin=False, is_managed=True
+                chat_id=chat_id,
+                user_id=user_id,
+                is_admin=False,
+                is_managed=True,
+                is_manager_admin=False,
             )
             for user_id in new_chat_members
         ]

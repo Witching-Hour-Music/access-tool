@@ -22,7 +22,7 @@ async def handle_start_message(event: events.NewMessage()) -> None:
                     [
                         types.KeyboardButtonWebView(
                             text="Set up Access",
-                            url="https://access.tools.tg/",
+                            url="https://127.0.0.1/",
                         )
                     ]
                 )
