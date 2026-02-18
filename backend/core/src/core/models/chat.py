@@ -67,6 +67,12 @@ class TelegramChatUser(Base):
         default=False,
         doc="Whether the user is an admin in the chat",
     )
+    is_manager_admin = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        doc="Whether the user is an admin with manager privileges",
+    )
     is_managed = mapped_column(
         Boolean,
         nullable=False,

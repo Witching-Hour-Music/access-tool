@@ -47,6 +47,9 @@ def mocked_managed_chat_action_factory() -> ChatManageActionFactory:
         with patch(
             "core.services.chat.user.TelegramChatUserService.is_chat_admin",
             return_value=True,
+        ), patch(
+            "core.services.chat.user.TelegramChatUserService.is_chat_manager_admin",
+            return_value=True,
         ):
             action = action_cls(
                 db_session=db_session,

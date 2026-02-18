@@ -17,7 +17,10 @@ from core.constants import (
 
 from community_manager.celery_app import app
 from community_manager.gateway.types import IndexChatCommand
-from community_manager.utils import is_chat_participant_manager_admin
+from community_manager.utils import (
+    is_chat_participant_manager_admin,
+    is_chat_participant_admin,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +106,10 @@ class TelegramGatewayService:
                         telegram_chat_user_service.create_or_update(
                             chat_id=chat_id,
                             user_id=user.id,
-                            is_admin=is_chat_participant_manager_admin(
+                            is_admin=is_chat_participant_admin(
+                                participant_user.participant
+                            ),
+                            is_manager_admin=is_chat_participant_manager_admin(
                                 participant_user.participant
                             ),
                             is_managed=False,

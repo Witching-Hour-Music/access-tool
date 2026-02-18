@@ -21,6 +21,10 @@ from community_manager.settings import community_manager_settings
 from community_manager.gateway.client import TelegramGatewayClient
 from community_manager.gateway.types import IndexChatCommand
 from community_manager.services.bot_api import TelegramBotApiService
+from community_manager.utils import (
+    is_chat_participant_admin,
+    is_chat_participant_manager_admin,
+)
 from core.actions.authorization import AuthorizationAction
 from core.actions.base import BaseAction
 from core.actions.user import UserAction
@@ -477,6 +481,7 @@ class CommunityManagerChatAction(BaseAction):
                 user_id=local_user.id,
                 is_admin=False,
                 is_managed=False,
+                is_manager_admin=False,
             )
             return
         # If the bot fully controls chat - check the user eligibility
@@ -488,7 +493,11 @@ class CommunityManagerChatAction(BaseAction):
             )
         ):
             self.telegram_chat_user_service.create_or_update(
-                chat_id=chat_id, user_id=local_user.id, is_admin=False, is_managed=True
+                chat_id=chat_id,
+                user_id=local_user.id,
+                is_admin=False,
+                is_managed=True,
+                is_manager_admin=False,
             )
             logger.debug(
                 f"User {local_user.telegram_id!r} was added to chat {chat_id!r}"
@@ -561,27 +570,38 @@ class CommunityManagerChatAction(BaseAction):
             self.telegram_chat_user_service.create(
                 chat_id=chat.id,
                 user_id=target_user.id,
-                is_admin=event.has_enough_rights,
+                is_admin=is_chat_participant_admin(event.new_participant),
                 # Because it was not added by the bot user
                 is_managed=False,
+                is_manager_admin=is_chat_participant_manager_admin(
+                    event.new_participant
+                ),
             )
             return
 
-        # Handle admin privileges update on the normal user
-        if event.is_demoted or not event.has_enough_rights:
-            if target_chat_user.is_admin:
-                logger.info("Admin %d demoted in chat %d", target_user.id, chat.id)
-                self.telegram_chat_user_service.demote_admin(
-                    chat_id=chat.id, user_id=target_chat_user.user_id
-                )
+        if not target_chat_user:
+            # Should not happen as we check for existence or create above
+            return
 
-        elif event.has_enough_rights:
-            if not target_chat_user.is_admin:
-                logger.info("Admin %d promoted in chat %d", target_user.id, chat.id)
-                self.telegram_chat_user_service.promote_admin(
-                    chat_id=chat.id,
-                    user_id=target_user.id,
-                )
+        is_admin = is_chat_participant_admin(event.new_participant)
+        is_manager_admin = is_chat_participant_manager_admin(event.new_participant)
+
+        if (
+            target_chat_user.is_admin != is_admin
+            or target_chat_user.is_manager_admin != is_manager_admin
+        ):
+            logger.info(
+                "Updating admin status for user %d in chat %d: admin=%s, manager=%s",
+                target_user.id,
+                chat.id,
+                is_admin,
+                is_manager_admin,
+            )
+            self.telegram_chat_user_service.update(
+                chat_user=target_chat_user,
+                is_admin=is_admin,
+                is_manager_admin=is_manager_admin,
+            )
 
     async def on_bot_chat_member_update(
         self, event: ChatAdminChangeEventBuilder.Event, chat: TelegramChatDTO
@@ -741,6 +761,7 @@ class CommunityManagerChatAction(BaseAction):
                 user_id=local_user.id,
                 is_admin=False,
                 is_managed=True,
+                is_manager_admin=False,
             )
             logger.info(
                 f"User {local_user.telegram_id!r} was approved to join chat {chat_id!r}",
@@ -1121,6 +1142,12 @@ class CommunityManagerUserChatAction:
             )
             return
 
+        if chat_member.is_admin:
+            logger.warning(
+                f"Attempt to kick admin {chat_member.chat_id=} and {chat_member.user_id=}. Skipping."
+            )
+            return
+
         if chat_member.chat.insufficient_privileges:
             logger.warning(
                 f"Attempt to kick chat member {chat_member.chat_id=} and {chat_member.user_id=} "
@@ -1162,11 +1189,11 @@ class CommunityManagerUserChatAction:
             )
         except (TelegramBadRequest, TelegramForbiddenError) as e:
             if "owner" in str(e) or "administrator" in str(e):
-                logger.info(
-                    f"User {chat_member.user.telegram_id!r} is an admin/owner in chat {chat_member.chat_id!r}. "
-                    f"Marking as admin and skipping kick."
-                )
+                logger.info("Marking as admin and skipping kick.")
                 chat_member.is_admin = True
+                # We don't know if they are manager admin, so we don't set it (defaults false if not set)
+                # But to be safe we can explicitly say we don't know, or leave as is.
+                # Since we likely just discovered they are admin, we set is_admin=True.
                 self.db_session.flush()
                 return
 
