@@ -1,8 +1,9 @@
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from community_manager.actions.chat import CommunityManagerUserChatAction
-from core.models.chat import TelegramChatUser, TelegramChat, User
+from core.models.chat import TelegramChatUser, TelegramChat
+from core.models.user import User
 
 
 @pytest.mark.asyncio
@@ -31,16 +32,16 @@ async def test_kick_chat_member_normal_user(db_session):
         user_id=1, chat_id=1, is_admin=False, is_managed=True, chat=chat, user=user
     )
 
-    # Mock bot_api_service to ensure it is called
-    action.bot_api_service = AsyncMock()
-    # Mock delete
-    action.telegram_chat_user_service.delete = (
-        AsyncMock()
-    )  # actually sync method, but mocked on instance?
-    # actually telegram_chat_user_service is initialized in __init__
-    # we can mock the whole service or specific method
-    action.telegram_chat_user_service = AsyncMock()
+    # Mock bot_api_service context manager
+    # We need to mock the class instantiated in the method: TelegramBotApiService
+    with patch("community_manager.actions.chat.TelegramBotApiService") as MockService:
+        mock_service_instance = AsyncMock()
+        MockService.return_value.__aenter__.return_value = mock_service_instance
 
-    await action.kick_chat_member(chat_user)
+        # Mock delete
+        # telegram_chat_user_service is synchronous
+        action.telegram_chat_user_service = MagicMock()
 
-    action.bot_api_service.kick_chat_member.assert_awaited_once()
+        await action.kick_chat_member(chat_user)
+
+        mock_service_instance.kick_chat_member.assert_awaited_once()

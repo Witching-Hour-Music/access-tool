@@ -7,13 +7,8 @@ from core.models.user import User
 from core.models.chat import TelegramChat
 
 
-class TestManagedChatAction(ManagedChatBaseAction):
-    def __init__(self, db_session, requestor, chat_slug):
-        # Allow to bypass super init logic for testing parts of it,
-        # or we mock everything super init uses.
-        # super init calls __get_target_chat which uses services.
-        # We need to mock services BEFORE init.
-        pass
+class MockManagedChatAction(ManagedChatBaseAction):
+    pass
 
 
 @pytest.fixture
@@ -59,12 +54,12 @@ def test_managed_chat_action_permissions(db_session):
         # Test success: user is manager admin
         mock_user_service_instance.is_chat_manager_admin.return_value = True
 
-        action = ManagedChatBaseAction(db_session, user, "test")
+        action = MockManagedChatAction(db_session, user, "test")
         assert action.chat == chat
 
         # Test fail: user is NOT manager admin
         mock_user_service_instance.is_chat_manager_admin.return_value = False
 
         with pytest.raises(HTTPException) as excinfo:
-            ManagedChatBaseAction(db_session, user, "test")
+            MockManagedChatAction(db_session, user, "test")
         assert excinfo.value.status_code == 403
