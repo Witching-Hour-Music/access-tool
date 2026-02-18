@@ -170,6 +170,37 @@ class TelegramChatUserService(BaseService):
 
         return query.all()
 
+    def yield_all_for_chat(
+        self, chat_id: int, batch_size: int = 100
+    ) -> Iterable[list[TelegramChatUser]]:
+        """
+        Yields all users for a given chat in batches, using keyset pagination.
+        This is useful for processing large chats without loading all users into memory.
+        """
+        last_seen_user_id = 0
+        while True:
+            stmt = (
+                select(TelegramChatUser)
+                .where(
+                    TelegramChatUser.chat_id == chat_id,
+                    TelegramChatUser.user_id > last_seen_user_id,
+                )
+                .order_by(TelegramChatUser.user_id.asc())
+                .limit(batch_size)
+                .options(
+                    joinedload(TelegramChatUser.wallet_link).options(
+                        joinedload(TelegramChatUserWallet.wallet),
+                    )
+                )
+            )
+            users = self.db_session.execute(stmt).scalars().all()
+
+            if not users:
+                break
+
+            yield users
+            last_seen_user_id = users[-1].user_id
+
     def get_all_by_linked_wallet(self, addresses: list[str]) -> list[TelegramChatUser]:
         query = self.db_session.query(TelegramChatUser)
         query = query.join(

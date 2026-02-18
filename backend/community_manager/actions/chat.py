@@ -1124,6 +1124,32 @@ class CommunityManagerUserChatAction:
         self.authorization_action = AuthorizationAction(db_session)
         # self.bot_api_service = TelegramBotApiService()
 
+    async def check_chat_members_compliance(self, chat_id: int) -> int:
+        """
+        Iterates over all members of a chat in batches and kicks ineligible members.
+
+        :param chat_id: The ID of the chat to check.
+        :return: The total number of members processed.
+        """
+        logger.info(f"Starting to check chat members for chat {chat_id=!r}.")
+
+        total_processed = 0
+        for chat_members_chunk in self.telegram_chat_user_service.yield_all_for_chat(
+            chat_id=chat_id,
+            batch_size=100,
+        ):
+            await self.kick_ineligible_chat_members(chat_members=chat_members_chunk)
+            total_processed += len(chat_members_chunk)
+            logger.info(
+                f"Processed chunk of {len(chat_members_chunk)} users for chat {chat_id=!r}. "
+                f"Total processed: {total_processed}"
+            )
+
+        logger.info(
+            f"Finished checking members for chat {chat_id=!r}. Total: {total_processed}"
+        )
+        return total_processed
+
     async def kick_chat_member(self, chat_member: TelegramChatUser) -> None:
         """
         Kicks a specified chat member from the chat. It ensures that the bot

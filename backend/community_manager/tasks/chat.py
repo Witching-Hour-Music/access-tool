@@ -44,11 +44,7 @@ async def check_target_chat_members(chat_id: int) -> None:
     with DBService().db_session() as db_session:
         # BotAPI does not need a telethon client
         action = CommunityManagerUserChatAction(db_session)
-        chat_members = action.telegram_chat_user_service.get_all(
-            chat_ids=[chat_id], with_wallet_details=True
-        )
-        logger.info(f"Found {len(chat_members)} chat members for chat {chat_id=!r}.")
-        await action.kick_ineligible_chat_members(chat_members=chat_members)
+        await action.check_chat_members_compliance(chat_id=chat_id)
 
 
 @app.task(
