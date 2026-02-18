@@ -346,7 +346,8 @@ class TelegramChatService(BaseService):
             TelegramChatUser, TelegramChat.id == TelegramChatUser.chat_id
         )
         query = query.filter(
-            TelegramChatUser.user_id == user_id, TelegramChatUser.is_admin.is_(True)
+            TelegramChatUser.user_id == user_id,
+            TelegramChatUser.is_manager_admin.is_(True),
         )
         query = query.order_by(TelegramChat.id)
         return query.all()
