@@ -171,7 +171,7 @@ class TelegramChatUserService(BaseService):
         return query.all()
 
     def yield_all_for_chat(
-        self, chat_id: int, batch_size: int = 100
+        self, chat_id: int, non_managed_only: bool = False, batch_size: int = 100
     ) -> Iterable[list[TelegramChatUser]]:
         """
         Yields all users for a given chat in batches, using keyset pagination.
@@ -179,12 +179,16 @@ class TelegramChatUserService(BaseService):
         """
         last_seen_user_id = 0
         while True:
+            filters = [
+                TelegramChatUser.chat_id == chat_id,
+                TelegramChatUser.user_id > last_seen_user_id,
+            ]
+            if non_managed_only:
+                filters.append(TelegramChatUser.is_managed.is_(False))
+
             stmt = (
                 select(TelegramChatUser)
-                .where(
-                    TelegramChatUser.chat_id == chat_id,
-                    TelegramChatUser.user_id > last_seen_user_id,
-                )
+                .where(*filters)
                 .order_by(TelegramChatUser.user_id.asc())
                 .limit(batch_size)
                 .options(
@@ -193,7 +197,7 @@ class TelegramChatUserService(BaseService):
                     )
                 )
             )
-            users = self.db_session.execute(stmt).scalars().unique().all()
+            users = list(self.db_session.execute(stmt).scalars().unique().all())
 
             if not users:
                 break
