@@ -1,0 +1,10 @@
+APScheduler==3.10.4
+cachetools==5.3.3
+pandas==2.2.2
+python-dotenv==1.0.1
+requests==2.32.3
+streamlit==1.44.1
+web3==6.20.2
+base58==2.1.1
+bech32==1.2.0
+python-dateutil==2.9.0.post0

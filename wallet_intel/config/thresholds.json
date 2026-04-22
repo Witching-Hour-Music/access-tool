@@ -1,0 +1,7 @@
+{
+  "sudden_balance_change_pct": 30,
+  "large_flow_usd": 10000,
+  "tx_spike_multiplier": 3,
+  "dormancy_days": 30,
+  "stale_data_hours": 24
+}
