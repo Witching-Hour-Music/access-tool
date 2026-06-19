@@ -3,7 +3,7 @@ from collections.abc import Generator, Sequence
 from core.utils.misc import batched
 
 from pytonapi.schema.jettons import JettonBalance, JettonsBalances
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import NoResultFound, IntegrityError
 from sqlalchemy.orm import joinedload
 
@@ -118,6 +118,34 @@ class WalletService(BaseService):
 
     def count(self) -> int:
         return self.db_session.query(UserWallet).count()
+
+    def get_master_wallet_rows(self) -> list[dict[str, int | str | None]]:
+        """Return one aggregate row per user wallet for master wallet exports."""
+        query = (
+            self.db_session.query(
+                UserWallet.address.label("address"),
+                UserWallet.user_id.label("user_id"),
+                UserWallet.balance.label("ton_balance"),
+                func.coalesce(func.sum(JettonWallet.balance), 0).label(
+                    "jetton_balance_total"
+                ),
+                func.count(JettonWallet.address).label("jetton_wallets_count"),
+            )
+            .outerjoin(JettonWallet, JettonWallet.owner_address == UserWallet.address)
+            .group_by(UserWallet.address, UserWallet.user_id, UserWallet.balance)
+            .order_by(UserWallet.address)
+        )
+
+        return [
+            {
+                "address": row.address,
+                "user_id": row.user_id,
+                "ton_balance": row.ton_balance,
+                "jetton_balance_total": int(row.jetton_balance_total),
+                "jetton_wallets_count": int(row.jetton_wallets_count),
+            }
+            for row in query.all()
+        ]
 
 
 class TelegramChatUserWalletService(BaseService):

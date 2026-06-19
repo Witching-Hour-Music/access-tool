@@ -87,6 +87,14 @@ class TonApiService:
     ) -> Account:
         return await self._tonapi.accounts.get_info(account_id=account_id)
 
+    async def get_account_nominators_pools(self, account_id: str) -> Any:
+        """Get all staking pools where the account participates."""
+        staking_client = self._tonapi.staking
+        if hasattr(staking_client, "get_participating_pools"):
+            return await staking_client.get_participating_pools(account_id=account_id)
+
+        return await staking_client.get_account_nominators_pools(account_id=account_id)
+
     async def get_all_jetton_holders(
         self, account_id: str
     ) -> AsyncGenerator[JettonHolders, None]:
