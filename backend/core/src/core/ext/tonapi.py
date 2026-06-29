@@ -10,6 +10,7 @@ from pytonapi.exceptions import TONAPIInternalServerError, TONAPINotFoundError
 from pytonapi.schema.accounts import Account
 from pytonapi.schema.jettons import JettonHolders, JettonsBalances, JettonInfo
 from pytonapi.schema.nft import NftItems, NftCollection
+from pytonapi.schema.staking import AccountStaking
 
 from core.dtos.resource import NftItemMetadataDTO, NftCollectionMetadataDTO
 from core.exceptions.external import ExternalResourceNotFound
@@ -86,6 +87,11 @@ class TonApiService:
         account_id: str,
     ) -> Account:
         return await self._tonapi.accounts.get_info(account_id=account_id)
+
+    async def get_account_staking(self, account_id: str) -> AccountStaking:
+        return await self._tonapi.staking.get_participating_pools(
+            account_id=account_id
+        )
 
     async def get_all_jetton_holders(
         self, account_id: str
