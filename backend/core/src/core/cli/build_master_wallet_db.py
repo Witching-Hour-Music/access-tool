@@ -4,43 +4,87 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
 
-async def _safe_staking_value(address: str, ton_api) -> int:
-    """
-    Best-effort extraction of stake amount from TON API account payload.
-    Returns 0 when staking data is absent.
-    """
-    account_info = await ton_api.get_account_info(address)
-
-    staking_info = getattr(account_info, "staking", None)
-    if staking_info is None:
+def _coerce_int(value: Any) -> int:
+    if value is None:
         return 0
 
-    total = 0
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _staking_pools(staking_info: Any) -> list[Any]:
+    if staking_info is None:
+        return []
+
+    if isinstance(staking_info, dict):
+        pools = staking_info.get("pools")
+    else:
+        pools = getattr(staking_info, "pools", None)
+
+    if pools is None:
+        return []
+
+    return list(pools)
+
+
+def _pool_amount(pool: Any) -> int:
+    if isinstance(pool, dict):
+        return _coerce_int(pool.get("amount"))
+
+    return _coerce_int(getattr(pool, "amount", None))
+
+
+def _extract_staking_amount(staking_info: Any) -> int:
+    """
+    Extract the active TON amount staked across all nominator pools.
+
+    TON API's getAccountNominatorsPools response is AccountStaking with a
+    pools[] collection. Each pool item exposes amount, pending_deposit,
+    pending_withdraw, and ready_withdraw; amount is the active stake currently
+    in that pool.
+    """
+    pools = _staking_pools(staking_info)
+    if pools:
+        return sum(_pool_amount(pool) for pool in pools)
+
+    # Backward-compatible fallback for older/mocked payload shapes.
     if isinstance(staking_info, dict):
         for key in ("balance", "staked", "amount", "total"):
-            value = staking_info.get(key)
-            if value is not None:
-                try:
-                    return int(str(value))
-                except ValueError:
-                    continue
+            amount = _coerce_int(staking_info.get(key))
+            if amount:
+                return amount
+        return 0
 
     for attr in ("balance", "staked", "amount", "total"):
-        value = getattr(staking_info, attr, None)
-        if value is not None:
-            try:
-                total = int(str(value))
-                break
-            except ValueError:
-                continue
+        amount = _coerce_int(getattr(staking_info, attr, None))
+        if amount:
+            return amount
 
-    return total
+    return 0
+
+
+async def _safe_staking_value(address: str, ton_api) -> int:
+    """
+    Best-effort extraction of active stake amount from TON API staking payload.
+    Returns 0 when staking data is absent or unavailable for the wallet.
+    """
+    try:
+        staking_info = await ton_api.get_account_staking(address)
+    except AttributeError:
+        # Compatibility for older tests/mocks that only expose account info.
+        account_info = await ton_api.get_account_info(address)
+        staking_info = getattr(account_info, "staking", None)
+
+    return _extract_staking_amount(staking_info)
 
 
 async def build_master_wallet_db(include_staking: bool) -> list[dict]:
