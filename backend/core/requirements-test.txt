@@ -164,7 +164,7 @@ psycopg-binary==3.2.9
     # via psycopg
 pyaes==1.6.1
     # via telethon
-pyasn1==0.6.1
+pyasn1==0.6.4
     # via rsa
 pycparser==2.23
     # via cffi
