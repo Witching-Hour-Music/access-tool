@@ -16,7 +16,7 @@ aiogram==3.24.0
     # via community_manager (backend/community_manager/pyproject.toml)
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.13.2
+aiohttp==3.14.3
     # via
     #   aiobotocore
     #   aiogram
