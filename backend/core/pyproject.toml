@@ -41,7 +41,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pip-tools==7.5.1",
-    "pytest==8.3.5",
+    "pytest==9.0.3",
     "pytest-cov==6.1.1",
     "pytest-mock==3.14.0",
     "factory-boy==3.3.3",
