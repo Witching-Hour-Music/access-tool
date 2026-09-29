@@ -184,7 +184,7 @@ pyproject-hooks==1.2.0
     # via
     #   build
     #   pip-tools
-pytest==8.3.5
+pytest==9.0.3
     # via
     #   core (backend/core/pyproject.toml)
     #   pytest-asyncio
