@@ -73,6 +73,13 @@ permissions:
 
 jobs:
   crda-scan:
+    # No CRDA_KEY or SNYK_TOKEN secret is configured in this repo, so the scan
+    # cannot authenticate and previously failed on every single run (including
+    # unrelated dependency bumps), red on the base branch too. Skip cleanly
+    # instead of reporting a false failure until one of the two secrets is
+    # added under Settings > Secrets and variables > Actions; this condition
+    # then makes the job run automatically once a credential exists.
+    if: ${{ secrets.CRDA_KEY != '' || secrets.SNYK_TOKEN != '' }}
     permissions:
       contents: read            # for actions/checkout to fetch code
       security-events: write    # for redhat-actions/crda to upload SARIF results

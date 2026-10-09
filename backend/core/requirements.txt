@@ -12,7 +12,7 @@ aiofiles==25.1.0
     # via aioboto3
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.13.2
+aiohttp==3.14.3
     # via aiobotocore
 aioitertools==0.13.0
     # via aiobotocore
@@ -26,7 +26,7 @@ amqp==5.3.1
     # via kombu
 annotated-types==0.7.0
     # via pydantic
-anyio==4.11.0
+anyio==4.14.2
     # via
     #   gql
     #   httpx
@@ -102,7 +102,7 @@ httpx==0.28.1
     #   pytonapi
 identify==2.6.15
     # via pre-commit
-idna==3.11
+idna==3.15
     # via
     #   anyio
     #   httpx
@@ -114,7 +114,7 @@ jmespath==1.0.1
     #   botocore
 kombu==5.6.0
     # via celery
-mako==1.3.10
+mako==1.3.12
     # via alembic
 markupsafe==3.0.3
     # via mako
@@ -145,7 +145,7 @@ psycopg-binary==3.2.9
     # via psycopg
 pyaes==1.6.1
     # via telethon
-pyasn1==0.6.1
+pyasn1==0.6.4
     # via rsa
 pycparser==2.23
     # via cffi
@@ -166,7 +166,7 @@ python-dateutil==2.9.0.post0
     #   aiobotocore
     #   botocore
     #   celery
-python-dotenv==1.2.1
+python-dotenv==1.2.2
     # via pydantic-settings
 python-slugify==8.0.4
     # via core (backend/core/pyproject.toml)
@@ -209,7 +209,7 @@ tzdata==2025.2
     # via
     #   celery
     #   kombu
-urllib3==2.5.0
+urllib3==2.7.0
     # via botocore
 vine==5.1.0
     # via

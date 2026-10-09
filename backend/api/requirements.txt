@@ -12,7 +12,7 @@ aiofiles==25.1.0
     # via aioboto3
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.13.2
+aiohttp==3.14.3
     # via aiobotocore
 aioitertools==0.13.0
     # via aiobotocore
@@ -75,7 +75,7 @@ click-plugins==1.1.1.2
     # via celery
 click-repl==0.3.0
     # via celery
-cryptography==44.0.2
+cryptography==50.0.0
     # via core (backend/core/pyproject.toml)
 distlib==0.4.0
     # via virtualenv
@@ -112,7 +112,7 @@ httpx==0.28.1
     #   pytonapi
 identify==2.6.15
     # via pre-commit
-idna==3.11
+idna==3.15
     # via
     #   anyio
     #   httpx
@@ -173,7 +173,7 @@ pydantic-core==2.27.2
     # via pydantic
 pydantic-settings==2.7.1
     # via core (backend/core/pyproject.toml)
-pyjwt==2.10.1
+pyjwt==2.13.0
     # via api (backend/api/pyproject.toml)
 pynacl==1.5.0
     # via core (backend/core/pyproject.toml)
@@ -227,7 +227,7 @@ tzdata==2025.2
     # via
     #   celery
     #   kombu
-urllib3==2.5.0
+urllib3==2.7.0
     # via
     #   botocore
     #   sentry-sdk
