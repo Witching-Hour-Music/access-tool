@@ -87,7 +87,7 @@ frozenlist==1.8.0
     #   aiosignal
 gql[httpx]==3.6.0b4
     # via core (backend/core/pyproject.toml)
-graphql-core==3.3.0a11
+graphql-core==3.3.0rc1
     # via gql
 greenlet==3.2.4
     # via sqlalchemy
