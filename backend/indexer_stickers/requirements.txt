@@ -79,7 +79,7 @@ distlib==0.4.0
     # via virtualenv
 fastapi==0.115.8
     # via core (backend/core/pyproject.toml)
-filelock==3.20.0
+filelock==4.2.1
     # via virtualenv
 frozenlist==1.8.0
     # via
